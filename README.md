@@ -1,6 +1,6 @@
 # Bridging Theory and Practice: An Evidence-Based Taxonomy of Security Properties with Modeling Patterns for ProVerif and Tamarin
 
-[![DOI](https://zenodo.org/badge/1193461070.svg)](https://doi.org/10.5281/zenodo.19352739)
+[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.23562839.svg)](https://doi.org/10.5281/zenodo.23562839)
 
 ### **Project Overview**
 
