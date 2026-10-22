@@ -1,0 +1,40 @@
+(*
+  Confidentiality / Secrecy (Section 4.2.3): the base property behind
+  this whole category -- a value marked secret must never be learned
+  (derived) by the attacker, however the protocol is attacked.
+*)
+
+type key.
+free public: channel.
+
+fun senc(bitstring, key): bitstring.
+reduc forall m: bitstring, k: key; sdec(senc(m, k), k) = m.
+
+free secret_msg: bitstring [private].
+
+(* --- Queries --- *)
+
+(* Secrecy: the secret must never become known to the attacker *)
+query attacker(secret_msg).
+
+(* Sanity check: Bob can complete a run *)
+event Completed(bitstring).
+query m: bitstring; event(Completed(m)).
+
+(* --- Roles --- *)
+
+(* Alice: encrypts the secret and sends it *)
+let processAlice(k: key) =
+    out(public, senc(secret_msg, k)).
+
+(* Bob: receives and decrypts *)
+let processBob(k: key) =
+    in(public, x: bitstring);
+    let m = sdec(x, k) in
+    event Completed(m);
+    0.
+
+(* Setup: shared key, unbounded sessions *)
+process
+    new k: key;
+    (!processAlice(k) | !processBob(k))

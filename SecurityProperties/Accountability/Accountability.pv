@@ -1,0 +1,104 @@
+(*
+  Accountability (Section 4.2.5): if the security goal is violated, the
+  responsible parties can be identified.
+
+  Example: the centralized monitor of Kuennemann, Esiyok and Backes,
+  "Automated Verification of Accountability in Security Protocols",
+  CSF 2019 (Examples 1, 3, 6 and 7). Source:
+  https://doi.org/10.1109/CSF.2019.00034
+
+  Protocol. A doctor D asks a trusted monitor M to perform actions on
+  patient records. Per protocol, D only ever requests the normal action
+  NormalAct. M checks D's signature, logs the request and executes it,
+  but does NOT check whether the action is normal, so exceptional
+  requests are possible (access is logged rather than prevented). The
+  adversary may corrupt D, learning D's signing key.
+*)
+
+(* Types and channels *)
+type skey.
+type pkey.
+
+free c: channel.
+
+(* Agent names, message tag and the normal action *)
+free D: bitstring.
+free Do: bitstring.
+free NormalAct: bitstring.
+
+(* Cryptographic primitives: digital signatures *)
+fun pk(skey): pkey.
+fun sign(bitstring, skey): bitstring.
+reduc forall m: bitstring, k: skey;
+    verify(sign(m, k), m, pk(k)) = true.
+
+(* Events *)
+event Corrupt(bitstring).            (* agent was corrupted            *)
+event LogD(bitstring).               (* monitor logged a request by D  *)
+event Execute(bitstring).            (* monitor executed an action     *)
+event Violation(bitstring).          (* ghost: not phi                 *)
+event Blame(bitstring, bitstring).   (* ghost: verdict V1 = {{D}}      *)
+
+(* --- Queries --- *)
+
+(* Sanity check: the honest protocol can execute the normal action *)
+query event(Execute(NormalAct)).
+
+(* SF_{omega1,phi,{D}}: phi can be violated when exactly {D} is
+   corrupted (D is the only corruptible agent). Reachability: the
+   desired ProVerif answer is "not event(Violation(a)) is false". *)
+query a: bitstring; event(Violation(a)).
+
+(* Sanity check: the verdict V1 = {{D}} is reachable *)
+query a: bitstring; event(Blame(D, a)).
+
+(* V_{omega1,V1}: whenever the verdict blames D, phi was violated *)
+query x: bitstring, a: bitstring;
+    event(Blame(x, a)) ==> event(Violation(a)).
+
+(* V_{omega2,V2}: whenever the verdict is empty, phi holds. Stated
+   contrapositively: every violation shows up in the log. *)
+query a: bitstring;
+    event(Violation(a)) ==> event(LogD(a)).
+
+(* M_{phi,V1}: minimality. The only proper subset of {D} is {}: no
+   trace violates phi without corrupting anybody. *)
+query a: bitstring;
+    event(Violation(a)) ==> event(Corrupt(D)).
+
+(* U_{omega1,V1}: uniqueness / fairness. Whenever an agent is blamed,
+   that agent was actually corrupted. *)
+query x: bitstring, a: bitstring;
+    event(Blame(x, a)) ==> event(Corrupt(x)).
+
+(* --- Roles --- *)
+
+(* Doctor D: signs only normal requests *)
+let Doctor(skD: skey) =
+    in(c, a: bitstring);
+    if a = NormalAct then
+        out(c, ((Do, a), sign((Do, a), skD))).
+
+(* Corruption procedure C_D: event Corrupt(D); out(sk(D)) *)
+let CorruptD(skD: skey) =
+    event Corrupt(D);
+    out(c, skD).
+
+(* Trusted monitor M: verifies, logs and executes any signed request *)
+let Monitor(pkD: pkey) =
+    in(c, ((=Do, a: bitstring), s: bitstring));
+    if verify(s, (Do, a), pkD) = true then
+        if a = NormalAct then
+            event LogD(a);
+            event Execute(a)
+        else
+            event LogD(a);
+            event Execute(a);
+            event Violation(a);
+            event Blame(D, a).
+
+(* Setup: D's key pair, unbounded sessions of D and M *)
+process
+    new skD: skey;
+    out(c, pk(skD));
+    ( (!Doctor(skD)) | CorruptD(skD) | (!Monitor(pk(skD))) )

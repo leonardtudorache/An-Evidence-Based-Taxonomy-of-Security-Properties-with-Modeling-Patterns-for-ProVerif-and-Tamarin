@@ -1,0 +1,50 @@
+/* Unforgeability (Section 4.2.2): nobody but the legitimate signer can
+   produce a message that validates as signed by them. SignedBy marks
+   a real signing action; Valid_sig marks a signature that
+   checks out; see the 'Unforgeability' lemma at the end. */
+
+theory Unforgeability
+begin
+
+builtins: signing
+
+/* 1. Setup: Generate keys and publish the public key */
+rule Setup:
+    [ Fr(~skA) ]
+  -->
+    [ !LtkA(~skA), !PkA(pk(~skA)), Out(pk(~skA)) ]
+
+/* 2. Process A: Sign a fresh message */
+rule ProcessA:
+    [ !LtkA(~skA), Fr(~m1) ]
+  --[ SignedBy(~skA, ~m1) ]->
+    [ Out(<~m1, sign(~m1, ~skA)>) ]
+
+/* 3. Process B: Receive message and signature, then verify */
+rule ProcessB:
+    [ In(<m, sig>)  
+    , !PkA(pkA) 
+    ]
+  --[ Eq(verify(sig, m, pkA), true)
+    , Valid_sig(m, pkA)
+    , Check()
+    ]->
+    [ ]
+
+/* --- Restrictions --- */
+
+restriction Equality:
+    "All x y #i. Eq(x, y) @ i ==> x = y"
+
+/* --- Lemmas --- */
+
+lemma Unforgeability:
+    all-traces
+    "All m pkA #i. Valid_sig(m, pkA) @ i ==> 
+        (Ex sk #j. SignedBy(sk, m) @ j & pk(sk) = pkA)"
+
+lemma Executability:
+    exists-trace
+    "Ex #i. Check() @ i"
+
+end

@@ -1,0 +1,104 @@
+(*
+  Post-Compromise Security (Section 4.2.3), a.k.a. backward secrecy:
+  even after a full compromise, a later key-agreement step can 'heal'
+  the protocol so future communication is secure again. Phase 1 below
+  is the compromise/leak; phase 2 is the healing + sending data that
+  should stay secret despite the earlier leak. compromise/heal mark
+  those two moments.
+*)
+
+(* Types and Constants *)
+type key.
+type exponent.
+type G.
+type id_key.
+
+(* Symmetric primitives *)
+fun h(key): key.
+fun kdf(key, key): key.
+fun enc(bitstring, key): bitstring.
+reduc forall m: bitstring, k: key; dec(enc(m, k), k) = m.
+
+(* Diffie-Hellman *)
+fun g(exponent): G.
+fun exp(G, exponent): key.
+equation forall x: exponent, y: exponent; exp(g(x), y) = exp(g(y), x).
+
+(* Digital Signatures for Authentication *)
+fun pub(id_key): id_key.
+fun sign(G, id_key): bitstring.
+reduc forall m: G, k: id_key; checksign(sign(m, k), pub(k)) = m.
+
+(* Channels and Secrets *)
+free c: channel.
+free secret_future_data: bitstring [private].
+
+event check().
+event compromise(id_key, id_key).
+event heal(id_key, id_key, key).
+
+(* --- Queries --- *)
+
+(* Sanity check: Bob can decrypt after healing *)
+query event(check()).
+
+(* Post-compromise security: future data stays secret after the heal *)
+query attacker(secret_future_data).
+
+(* --- Roles --- *)
+
+(* Alice: leaks her state (phase 1), then heals and sends data (phase 2) *)
+let Alice(rk_0: key, skA: id_key, pkB: id_key) =
+    (* --- PHASE 1: THE COMPROMISE --- *)
+    phase 1;
+    out(c, rk_0); (* Symmetric state is leaked to attacker *)
+    event compromise(pub(skA), pkB);
+
+    (* --- PHASE 2: THE HEALING --- *)
+    phase 2;
+    new a: exponent;
+    let ga = g(a) in
+    out(c, (ga, sign(ga, skA))); (* Alice sends signed contribution *)
+    
+    in(c, (gb: G, sigB: bitstring));
+    if checksign(sigB, pkB) = gb then (
+        let shared_secret = exp(gb, a) in
+        let rk_1 = kdf(rk_0, shared_secret) in
+        let chain_key = h(rk_1) in
+        event heal(pub(skA), pkB, chain_key);
+        out(c, enc(secret_future_data, chain_key))
+    ).
+
+(* Bob: heals and receives the data *)
+let Bob(rk_0: key, skB: id_key, pkA: id_key) =
+    phase 1;
+    (* Bob's state is also effectively leaked *)
+    
+    phase 2;
+    new b: exponent;
+    let gb = g(b) in
+    
+    in(c, (ga: G, sigA: bitstring));
+    if checksign(sigA, pkA) = ga then (
+        out(c, (gb, sign(gb, skB))); (* Bob sends signed contribution *)
+        
+        let shared_secret = exp(ga, b) in
+        let rk_1 = kdf(rk_0, shared_secret) in
+        let chain_key = h(rk_1) in
+        event heal(pkA, pub(skB), chain_key);
+        in(c, ciphertext: bitstring);
+        let decrypted_data = dec(ciphertext, chain_key) in
+        event check();
+        0
+    ).
+
+(* Setup: identity keys and initial shared state *)
+process
+    (* Setup long-term identity keys *)
+    new skA: id_key; let pkA = pub(skA) in out(c, pkA);
+    new skB: id_key; let pkB = pub(skB) in out(c, pkB);
+    
+    (* Setup initial shared symmetric state *)
+    new shared_rk: key;
+    
+    (Alice(shared_rk, skA, pkB) | Bob(shared_rk, skB, pkA))

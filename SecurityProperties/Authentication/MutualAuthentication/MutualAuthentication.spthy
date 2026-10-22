@@ -1,0 +1,182 @@
+theory MutualAuthentication
+begin
+
+builtins: revealing-signing, asymmetric-encryption
+
+functions: nonce_to_bitstring/1, messtermI/2, messtermR/2
+
+/* Mutual Authentication (Section 4.2.1): Lowe's agreement checked in
+   both directions -- see the 'mutual_authentication' lemma at the
+   end, and the per-rule comments above StartI/StartR/EndI/EndR for
+   how each direction's start/end witnesses are obtained. */
+
+rule Register_Server:
+  [ Fr(~sks) ]
+  -->
+  [ !LtkS(~sks), !PkS(pk(~sks)), Out(pk(~sks)) ]
+
+rule Register:
+  [ Fr(~sk) ]
+  --[ Register($X) ]->
+  [ !Ltk($X, ~sk), !Pk($X, pk(~sk)), Out(pk(~sk)) ]
+
+restriction Register_once:
+  "All x #i #j. Register(x) @ i & Register(x) @ j ==> #i = #j"
+
+rule Initiator_start:
+  [
+    !Ltk($A, ~ska)
+  ]
+  --[ Start_Initiator() ]->
+  [
+    Out(<$A, $B>),
+    State_Initiator_1(~ska)
+  ]
+
+rule Initiator_responds_to_step2:
+  let
+    msg_tuple = getMessage(step2_p0)
+    pkx = fst(msg_tuple)
+    check0 = snd(msg_tuple)
+    m3 = aenc(<~na, $A>, pkx)
+  in
+  [
+    !Ltk($A, ~ska),
+    State_Initiator_1(~ska),
+    !PkS(pk_s),
+    Fr(~na),
+    In(step2_p0)
+  ]
+  --[ Eq(revealVerify(step2_p0, msg_tuple, pk_s), true), Eq(check0, $B),
+      StartI($A, check0, ~na), OUT_I2(m3) ]->
+  [
+    Out(m3),
+    State_Initiator_2(~ska, pkx, ~na, m3, check0)
+  ]
+
+rule Initiator_responds_to_step6:
+  let
+    msg_m6_in = adec(m6_in, ~ska)
+    check0 = fst(msg_m6_in)
+    nx2 = fst(snd(msg_m6_in))
+    check1 = snd(snd(msg_m6_in))
+    m7 = aenc(nx2, pkx)
+  in
+  [
+    !Ltk($A, ~ska),
+    State_Initiator_2(~ska, pkx, ~na, m3, bPartner),
+    In(m6_in)
+  ]
+  --[ Eq(check0, ~na), Eq(check1, bPartner), End_Initiator($A), EndI($A, bPartner, nx2), IN_I6(nx2, m6_in) ]->
+  [
+    Out(m7)
+  ]
+
+rule Responder_responds_to_step3:
+  let
+    msg_m3_in = adec(m3_in, ~skb)
+    ny = fst(msg_m3_in)
+    hosty = snd(msg_m3_in)
+  in
+  [
+    !Ltk($B, ~skb),
+    In(m3_in)
+  ]
+  --[ IN_R3(ny, m3_in), Resp_start() ]->
+  [
+    Out(<$A, hosty>),
+    State_Responder_1(~skb, m3_in, ny, hosty)
+  ]
+
+rule Responder_responds_to_step5:
+  let
+    msg_tuple = getMessage(step5_p0)
+    pky = fst(msg_tuple)
+    check0 = snd(msg_tuple)
+    m6 = aenc(<ny, ~nb, $B>, pky)
+  in
+  [
+    !Ltk($B, ~skb),
+    State_Responder_1(~skb, m3_in, ny, hosty),
+    !PkS(pk_s),
+    Fr(~nb),
+    In(step5_p0)
+  ]
+  --[ Eq(revealVerify(step5_p0, msg_tuple, pk_s), true), Eq(check0, $A),
+      StartR($B, hosty, ~nb), OUT_R5(m6) ]->
+  [
+    Out(m6),
+    State_Responder_2(~skb, m3_in, ny, hosty, pky, ~nb, m6)
+  ]
+
+rule Responder_responds_to_step7:
+  let
+    m_adec = adec(m7_in, ~skb)
+  in
+  [
+    !Ltk($B, ~skb),
+    State_Responder_2(~skb, m3_in, ny, hosty, pky, ~nb, m6),
+    In(m7_in)
+  ]
+  --[ Eq(~nb, m_adec), End_Responder($B), EndR($B, hosty, ny) ]->
+  [
+  ]
+
+rule S_responds_to_step1:
+  [
+    !LtkS(~sks),
+    !Pk(B_in, pkB_in),
+    In(<A_in, B_in>)
+  ]
+  --[  ]->
+  [
+    Out(revealSign(<pkB_in, B_in>, ~sks)),
+    State_S_1(~sks, A_in, B_in)
+  ]
+
+rule S_responds_to_step4:
+  [
+    !LtkS(~sks),
+    State_S_1(~sks, A_in, B_in),
+    In(<A_in, hostY_in>),
+    !Pk(hostY_in, pkY_in)
+  ]
+  --[ End_S($S) ]->
+  [
+    Out(revealSign(<pkY_in, hostY_in>, ~sks))
+  ]
+
+  /* SCOPE LIMITATION -- The responder is bounded to a SINGLE session. Initiator sessions,
+   server certificate issuance and the adversary all remain unbounded.
+
+   Without this bound tamarin-prover does not terminate on either lemma:
+   we tried all six built-in heuristics (s S c C i I), a sources/typing
+   invariant, and a [reuse] long-term-key-secrecy lemma, and none of them
+   closed the final responder step. The seven-message certificate-server
+   flow, over revealing-signing plus asymmetric-encryption, is simply
+   heavier than the three-message NSLPK3 skeleton the four sibling
+   Authentication models use.
+
+   So: mutual authentication is established here against an unbounded
+   adversary and unbounded initiator sessions, for one responder run. It
+   is NOT a full unbounded-session result, and should not be reported as
+   one. */
+restriction One_responder_session:
+  "All #i #j. Resp_start() @ i & Resp_start() @ j ==> #i = #j"
+
+restriction Equality:
+  "All x y #i. Eq(x,y) @i ==> x = y"
+
+/* Mutual authentication, Section 4.2.1 of the taxonomy:
+     (All A,B,t,i. end(A,B,t,i) ==> Ex j. start(B,A,t,j))
+     & (All A,B,t,i. end(B,A,t,i) ==> Ex j. start(A,B,t,j))
+
+   EndI/StartR give the first conjunct: whenever the initiator (a)
+   ends believing its partner is (b), with nonce t, the responder (b)
+   must have started believing its partner is (a), with the SAME t.
+   EndR/StartI give the second conjunct, with the roles swapped. */
+lemma mutual_authentication:
+  "(All a b t #i. EndI(a, b, t) @ i ==> (Ex #j. StartR(b, a, t) @ j))
+ & (All a b t #i. EndR(b, a, t) @ i ==> (Ex #j. StartI(a, b, t) @ j))"
+
+end

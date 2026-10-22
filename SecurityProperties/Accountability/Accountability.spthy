@@ -1,0 +1,92 @@
+/* Accountability (Section 4.2.5): if the security goal is violated, the
+   responsible parties can be identified.
+
+   Example: the centralized monitor of Kuennemann, Esiyok and Backes,
+   "Automated Verification of Accountability in Security Protocols",
+   CSF 2019 (Examples 1, 3, 6 and 7). Source:
+   https://doi.org/10.1109/CSF.2019.00034
+
+   Protocol. A doctor D asks a trusted monitor M to perform actions on
+   patient records. Per protocol, D only ever requests the normal action
+   'NormalAct'. M checks D's signature, logs the request and executes it,
+   but does NOT check whether the action is normal, so exceptional
+   requests are possible (access is logged rather than prevented). The
+   adversary may corrupt D, learning D's signing key.
+    */
+
+theory Accountability_CentralizedMonitor
+begin
+
+builtins: signing
+
+/* --- Setup: D's long-term signing key; the public key is published --- */
+rule Setup_D:
+    [ Fr(~skD) ]
+  --[ ]->
+    [ !Ltk('D', ~skD), !Pk('D', pk(~skD)), Out(pk(~skD)) ]
+
+/* --- Doctor D: signs only normal requests --- */
+rule Doctor_Request:
+    [ !Ltk('D', skD), In(a) ]
+  --[ Eq(a, 'NormalAct') ]->
+    [ Out(<<'Do', a>, sign(<'Do', a>, skD)>) ]
+
+/* --- Corruption procedure C_D: event Corrupt('D'); out(sk(D)) --- */
+rule Corrupt_D:
+    [ !Ltk('D', skD) ]
+  --[ Corrupt('D') ]->
+    [ Out(skD) ]
+
+/* --- Trusted monitor M: verifies, logs and executes any signed request --- */
+rule Monitor:
+    [ In(<<'Do', a>, s>), !Pk('D', pkD) ]
+  --[ Eq(verify(s, <'Do', a>, pkD), true)
+    , LogD(a)
+    , Execute(a)
+    ]->
+    [ ]
+
+/* --- Restrictions --- */
+restriction Equality:
+    "All x y #i. Eq(x, y) @ i ==> x = y"
+
+/* --- Sanity check: the honest protocol runs with nobody corrupted --- */
+lemma Sanity_HonestExecution:
+    exists-trace
+    "Ex #i. Execute('NormalAct') @ i & not (Ex A #j. Corrupt(A) @ j)"
+
+/* --- Verification conditions (Kuennemann et al., Table I) --- */
+
+/* SF_{omega1,phi,{D}}: there is a trace that violates phi in which
+   exactly {D} is corrupted, i.e. D alone suffices to cause the
+   violation (counterfactual sufficiency). */
+lemma SF_Sufficiency_D:
+    exists-trace
+    "Ex a #i #j. Execute(a) @ i & not (a = 'NormalAct')
+               & Corrupt('D') @ j
+               & (All A #k. Corrupt(A) @ k ==> A = 'D')"
+
+/* V_{omega1,V1}: whenever the verdict blames D, phi was violated. */
+lemma V_Verifiability_omega1:
+    "All a #i. LogD(a) @ i & not (a = 'NormalAct')
+       ==> Ex b #j. Execute(b) @ j & not (b = 'NormalAct')"
+
+/* V_{omega2,V2}: whenever the verdict is empty, phi holds.
+   Stated contrapositively: every violation shows up in the log. */
+lemma V_Verifiability_omega2:
+    "All a #i. Execute(a) @ i & not (a = 'NormalAct')
+       ==> Ex #j. LogD(a) @ j"
+
+/* M_{phi,V1}: minimality. The only proper subset of {D} is {}: no
+   trace violates phi without corrupting anybody. */
+lemma M_Minimality_D:
+    "All a #i. Execute(a) @ i & not (a = 'NormalAct')
+       ==> Ex A #j. Corrupt(A) @ j & #j < #i"
+
+/* U_{omega1,V1}: uniqueness / fairness. Whenever D is blamed, D was
+   actually corrupted, so an honest D is never blamed. */
+lemma U_Uniqueness_D:
+    "All a #i. LogD(a) @ i & not (a = 'NormalAct')
+       ==> Ex #j. Corrupt('D') @ j & #j < #i"
+
+end

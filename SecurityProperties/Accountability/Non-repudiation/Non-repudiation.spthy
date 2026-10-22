@@ -1,0 +1,62 @@
+/* Non-repudiation (Section 4.2.5): this auction example checks that
+   a Won claim traces back to an earlier real Bid -- the same idea as
+   the paper's obs(m)==>sent(m), in a concrete auction setting. See
+   the 'NonRepudiation' lemma at the end.
+
+   SCOPE -- what this model does NOT cover. Section 4.2.5 gives a
+   second, stronger formalization, verifies(J,e,a,m) => sent(a,m),
+   where J is an independent third-party judge and e is an evidence
+   term cryptographically binding a to m. This model has neither a
+   judge role nor an evidence term: Won and Bid are two events of the
+   same protocol, so what is checked here is closer to a
+   correspondence between roles than to third-party verifiability.
+   Adding the judge is the missing piece for full coverage of the
+   taxonomy's definition. */
+
+theory AuctionNonRepudiation
+begin
+
+builtins: signing, hashing
+
+/* 1. Setup */
+rule Setup_Bidder:
+    [ Fr(~skB) ]
+  -->
+    [ !LtkB(~skB), !PkB(pk(~skB)), Out(pk(~skB)) ]
+
+/* 2. Bidder Role */
+rule Bidder_Send_Bid:
+    let 
+        bid_msg = <~price, ~id, ~n>
+        sig = sign(h(bid_msg), ~skB)
+    in
+    [ !LtkB(~skB), Fr(~price), Fr(~id), Fr(~n) ]
+  --[ Bid(~price, ~id) ]->
+    [ Out(<bid_msg, sig>) ]
+
+/* 3. Auctioneer Role */
+rule Auctioneer_Receive_And_Win:
+    let 
+        bid_msg = <p, id, n>
+    in
+    [ In(<bid_msg, sig>)   // Receive bid
+    , !PkB(pkB)            // Get public key
+    , Fr(~win_confirm)     // Generate the fresh confirmation value here!
+    ]
+  --[ Eq(verify(sig, h(bid_msg), pkB), true)
+    , Won(p, id) 
+    ]->
+    [ Out(~win_confirm) ]  // Now it is a bound variable
+
+/* --- Restrictions --- */
+
+restriction Equality:
+    "All x y #i. Eq(x, y) @ i ==> x = y"
+
+/* --- Security Lemma --- */
+
+lemma NonRepudiation:
+    all-traces
+    "All p id #i. Won(p, id) @ i ==> (Ex #j. Bid(p, id) @ j & #j < #i)"
+
+end

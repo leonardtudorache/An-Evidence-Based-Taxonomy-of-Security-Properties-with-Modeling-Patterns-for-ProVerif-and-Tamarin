@@ -1,0 +1,60 @@
+(*
+  Non-equivocation, signer-side (Section 4.2.2).
+
+    valid_sig(k, m)  m is valid under public key k: it was signed with
+                     the matching private key and verification succeeded.
+
+    forall k, m1, m2. valid_sig(k, m1) && valid_sig(k, m2) ==> m1 = m2
+
+  Each signer instance gets a one-time key and signs only once, so no
+  two different messages can be valid under the same key.
+*)
+
+(* Needed so ProVerif knows each instance receives only one message m. *)
+set preciseActions = true.
+
+free c: channel.
+
+type host.
+type skey.
+type pkey.
+
+fun pk(skey): pkey.
+fun sign(bitstring, skey): bitstring.
+reduc forall m: bitstring, sk: skey; checksign(sign(m, sk), pk(sk)) = m.
+
+(* Registered public keys of signer instances *)
+table instanceKeys(host, pkey).
+
+event valid_sig(pkey, bitstring).
+
+(* --- Queries --- *)
+
+(* Non-equivocation *)
+query k: pkey, m1: bitstring, m2: bitstring;
+    event(valid_sig(k, m1)) && event(valid_sig(k, m2)) ==> m1 = m2.
+
+(* Sanity check: a signature can be validated *)
+query k: pkey, m: bitstring; event(valid_sig(k, m)).
+
+(* --- Roles --- *)
+
+(* Signer instance: fresh one-time key, signs one message chosen by the attacker *)
+let Signer(A: host) =
+    new sk: skey;
+    insert instanceKeys(A, pk(sk));
+    out(c, pk(sk));
+    in(c, m: bitstring);
+    out(c, (m, sign(m, sk))).
+
+(* Verifier: checks the signature under a registered key *)
+let Verifier(V: host) =
+    in(c, (A: host, k: pkey, s: bitstring));
+    get instanceKeys(=A, =k) in
+    let m = checksign(s, k) in
+    event valid_sig(k, m).
+
+(* Setup: unbounded signer instances and verifiers *)
+process
+    ( !( in(c, A: host); !Signer(A) ) )
+  | ( !( in(c, V: host); !Verifier(V) ) )

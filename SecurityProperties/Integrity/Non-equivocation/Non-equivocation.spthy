@@ -1,0 +1,53 @@
+/*
+  Non-equivocation, signer-side (Section 4.2.2).
+
+    Valid_sig(k, m)  m is valid under public key k: it was signed with
+                     the matching private key and verification succeeded.
+
+    All k m1 m2. Valid_sig(k, m1) & Valid_sig(k, m2) ==> m1 = m2
+
+  Each signer instance gets a one-time key and signs only once, so no
+  two different messages can be valid under the same key.
+*/
+
+theory NonEquivocation_SignerSide
+begin
+
+builtins: signing
+
+/* New signer instance with a fresh one-time key; public key is registered */
+rule Instance_Key:
+    [ Fr(~sk) ]
+  -->
+    [ SigningSlot($A, ~sk), !InstancePk($A, pk(~sk)), Out(pk(~sk)) ]
+
+/* Sign one message chosen by the attacker; the slot is used up */
+rule Sign_Once:
+    [ SigningSlot($A, sk), In(m) ]
+  -->
+    [ Out(<m, sign(m, sk)>) ]
+
+/* Any verifier checks the signature under a registered key */
+rule Verify:
+    [ !InstancePk($A, k), In(<m, s>) ]
+  --[ Eq(verify(s, m, k), true),
+      Valid_sig(k, m)
+    ]->
+    [ ]
+
+restriction Equality:
+    "All x y #i. Eq(x, y) @ i ==> x = y"
+
+/* Non-equivocation */
+lemma non_equivocation:
+    "All k m1 m2 #i #j.
+       Valid_sig(k, m1) @ i & Valid_sig(k, m2) @ j
+       ==> m1 = m2"
+
+/* Sanity: a message can be validated twice under the same key */
+lemma Executability:
+    exists-trace
+    "Ex k m #i #j.
+       Valid_sig(k, m) @ i & Valid_sig(k, m) @ j & not (#i = #j)"
+
+end

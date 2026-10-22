@@ -1,0 +1,47 @@
+
+======================================================================
+STATUS    VERDICT     MODEL                                                                              DETAIL
+----------------------------------------------------------------------
+PASS      true        CaseStudies/Signcryption/signcryption.pv                                           2 security + 1 reachability ok (0s)
+PASS      verified    CaseStudies/Signcryption/signcryption.spthy                                        3/3 lemmas (0s)
+PASS      true        CaseStudies/Signcryption/signcryption_initial.pv                                   0 security + 1 reachability ok (0s)
+PASS      verified    CaseStudies/Signcryption/signcryption_initial.spthy                                1/1 lemmas (1s)
+PASS      true        SecurityProperties/Accountability/Accountability.pv                                4 security + 3 reachability ok (0s)
+PASS      verified    SecurityProperties/Accountability/Accountability.spthy                             6/6 lemmas (0s)
+PASS      true        SecurityProperties/Accountability/Non-repudiation/Non-Repudiation.pv               1 security + 1 reachability ok (0s)
+PASS      verified    SecurityProperties/Accountability/Non-repudiation/Non-repudiation.spthy            1/1 lemmas (0s)
+PASS      true        SecurityProperties/Accountability/Traceability/Untraceability.pv                   2 security + 2 reachability ok (0s)
+PASS      verified    SecurityProperties/Accountability/Traceability/Untraceability.spthy                2/2 lemmas (0s)
+PASS      true        SecurityProperties/Authentication/Aliveness/Aliveness.pv                           1 security + 1 reachability ok (0s)
+PASS      verified    SecurityProperties/Authentication/Aliveness/Aliveness.spthy                        2/2 lemmas (1s)
+PASS      true        SecurityProperties/Authentication/InjectiveAgreement/InjectiveAgreement.pv         1 security + 1 reachability ok (0s)
+PASS      verified    SecurityProperties/Authentication/InjectiveAgreement/InjectiveAgreement.spthy      2/2 lemmas (0s)
+PASS      true        SecurityProperties/Authentication/MutualAuthentication/MutualAuthentication.pv     4 security + 2 reachability ok (0s)
+PASS      verified    SecurityProperties/Authentication/MutualAuthentication/MutualAuthentication.spthy  1/1 lemmas (7s)
+PASS      true        SecurityProperties/Authentication/Non-injectiveAgreement/Non-injectiveAgreement.pv 1 security + 1 reachability ok (0s)
+PASS      verified    SecurityProperties/Authentication/Non-injectiveAgreement/Non-injectiveAgreement.spthy 2/2 lemmas (1s)
+PASS      true        SecurityProperties/Authentication/WeakAgreement/WeakAgreement.pv                   2 security + 1 reachability ok (0s)
+PASS      verified    SecurityProperties/Authentication/WeakAgreement/WeakAgreement.spthy                2/2 lemmas (0s)
+PASS      true        SecurityProperties/Authentication/authentication.pv                                1 security + 1 reachability ok (0s)
+PASS      verified    SecurityProperties/Authentication/authentication.spthy                             2/2 lemmas (0s)
+PASS      true        SecurityProperties/Confidentiality/ForwardSecrecy/ForwardSecrecy.pv                2 security + 1 reachability ok (0s)
+PASS      verified    SecurityProperties/Confidentiality/ForwardSecrecy/ForwardSecrecy.spthy             1/1 lemmas (1s)
+PASS      true        SecurityProperties/Confidentiality/Post-compromiseSecurity/PostCompromiseSecurity.pv 1 security + 1 reachability ok (0s)
+PASS      verified    SecurityProperties/Confidentiality/Post-compromiseSecurity/PostCompromiseSecurity.spthy 2/2 lemmas (5s)
+PASS      true        SecurityProperties/Confidentiality/Secrecy.pv                                      1 security + 1 reachability ok (1s)
+PASS      verified    SecurityProperties/Confidentiality/Secrecy.spthy                                   2/2 lemmas (0s)
+PASS      true        SecurityProperties/Integrity/Non-equivocation/Non-equivocation.pv                  1 security + 1 reachability ok (0s)
+PASS      verified    SecurityProperties/Integrity/Non-equivocation/Non-equivocation.spthy               2/2 lemmas (0s)
+PASS      true        SecurityProperties/Integrity/Non-equivocation/Non-equivocation_lower_bound.pv      3 security + 1 reachability ok (0s)
+PASS      verified    SecurityProperties/Integrity/Non-equivocation/Non-equivocation_lower_bound.spthy   4/4 lemmas (1s)
+PASS      true        SecurityProperties/Integrity/Unforgeability/Unforgeability.pv                      1 security + 1 reachability ok (0s)
+PASS      verified    SecurityProperties/Integrity/Unforgeability/Unforgeability.spthy                   2/2 lemmas (0s)
+PASS      true        SecurityProperties/Privacy/Anonymity/Anonymity.pv                                  1 security + 1 reachability ok (0s)
+PASS      verified    SecurityProperties/Privacy/Anonymity/Anonymity.spthy                               1/1 lemmas (0s)
+PASS      true        SecurityProperties/Privacy/Unlinkability/Unlinkability.pv                          1 security + 0 reachability ok (0s)
+PASS      verified    SecurityProperties/Privacy/Unlinkability/Unlinkability.spthy                       1/1 lemmas (0s)
+----------------------------------------------------------------------
+passed: 38   failed: 0   skipped: 0
+RESULT: all models proved.
+======================================================================
+full log: PATH_TO_FOLDER/An-Executable-Taxonomy-of-Security-Properties-for-ProVerif-and-Tamarin/results/run-20261022-133350.log

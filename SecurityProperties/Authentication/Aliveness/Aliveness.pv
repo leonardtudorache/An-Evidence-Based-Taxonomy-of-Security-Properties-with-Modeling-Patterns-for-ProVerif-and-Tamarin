@@ -1,0 +1,59 @@
+(*
+  Aliveness (Section 4.2.1 of the taxonomy) is the weakest form of
+  authentication: it only requires that the other agent has been
+  active in the protocol at some point -- not that it was talking to
+  us specifically, or recently.
+
+  Event placement follows the paper's convention: start() is raised at
+  the responder's FIRST step, as early as possible in B's execution,
+  while end() is raised at the initiator's LAST step, after A has
+  verified the signature. Placing start() late would let the
+  correspondence be satisfied trivially.
+*)
+
+free c : channel.
+
+type key.
+fun pk(key): key.
+fun sign(bitstring, key): bitstring.
+fun checksign(bitstring, key): bitstring
+
+reduc forall m: bitstring, k: key; checksign(sign(m, k), pk(k)) = m.
+
+event start().   
+event end().   
+
+(* --- Queries --- *)
+
+(* Aliveness: if A finishes, some run of the responder must have started.
+   No nonce and no peer are matched -- agreement on the exchanged data
+   is weak / non-injective agreement, not aliveness. *)
+query x: bitstring; event(end()) ==> event(start()).
+
+(* Sanity check: the initiator can finish *)
+query event(end()).
+
+(* --- Roles --- *)
+
+(* Initiator A *)
+let initiatorA(pkB: key) =
+  new na: bitstring;
+  out(c, na);
+  in(c, (nb: bitstring, sig: bitstring));
+
+  if checksign(sig, pkB) = (nb, na) then 
+    event end().
+
+(* Responder B *)
+let responderB(skB: key) =
+  in(c, na: bitstring);
+  event start();
+  new nb: bitstring;
+  out(c, (nb, sign((nb, na), skB))).
+
+(* Setup: responder key pair, unbounded sessions *)
+process
+  new skB: key;
+  let pkB = pk(skB) in
+  out(c, pkB);
+  (! initiatorA(pkB)) | (! responderB(skB))

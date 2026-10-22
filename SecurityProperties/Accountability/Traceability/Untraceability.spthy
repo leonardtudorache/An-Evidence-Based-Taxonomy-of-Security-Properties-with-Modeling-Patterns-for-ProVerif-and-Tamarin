@@ -1,0 +1,62 @@
+/* Note: Section 4.2.5's Traceability requires a trusted party to be
+   ABLE to trace a sender; this file instead models RFID
+   untraceability -- that a tag's sessions cannot be linked by an
+   observer (a related but opposite-flavored privacy property). */
+
+theory Untraceability
+begin
+
+builtins: symmetric-encryption
+
+/* 1. Setup: Register Tags with a shared key k */
+rule Register_Tag:
+    [ Fr(~id), Fr(~k) ]
+  -->
+    [ !SharedKey(~id, ~k) ]
+
+/* 2. Reader: Initiates the protocol */
+rule Reader_1:
+    [ ]
+  --[ ReaderStart() ]->
+    [ Out('Welcome'), State_Reader_Wait() ]
+
+/* 3. Tag: Responds to Welcome message */
+rule Tag_1:
+    [ In('Welcome')
+    , !SharedKey(id, k)
+    , Fr(~n) 
+    ]
+  --[ TagStart(id) ]->
+    [ Out(senc(<'Welcome', id>, k))
+    , TagEnd(id) 
+    ]
+
+/* 4. Reader: Receives and decrypts tag response */
+rule Reader_2:
+    [ State_Reader_Wait()
+    , In(m)
+    , !SharedKey(id, k) 
+    ]
+  --[ Eq(sdec(m, k), <'Welcome', id>)
+    , ReaderEnd(id) 
+    ]->
+    [ ]
+
+/* --- Restrictions --- */
+
+restriction Equality:
+    "All x y #i. Eq(x, y) @ i ==> x = y"
+
+/* --- Lemmas --- */
+
+/* Correspondence: ReaderEnd implies TagStart */
+lemma Authentication:
+    all-traces
+    "All id #i. ReaderEnd(id) @ i ==> (Ex #j. TagStart(id) @ j & #j < #i)"
+
+/* Executability: Can the protocol finish? */
+lemma Executability:
+    exists-trace
+    "Ex id #i. ReaderEnd(id) @ i"
+
+end

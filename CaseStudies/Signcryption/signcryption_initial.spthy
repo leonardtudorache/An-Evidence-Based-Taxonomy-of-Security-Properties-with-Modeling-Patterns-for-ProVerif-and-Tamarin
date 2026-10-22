@@ -1,0 +1,93 @@
+theory Signcryption
+begin
+
+builtins: signing
+
+functions: 
+    e/2,
+    h/1,  
+    senc/2, sdec/2,
+    signcrypt/4, 
+    verifySignature/4
+
+/* Algebraic model of Zheng's signcryption.
+   Alice derives K = e(pkB, x) = y_b^x and sends s = x/(r + x_a).
+   Bob recovers the same K from (pkA, r, s) using his secret key.
+
+   The original equation
+     verifySignature(pk(skA), r, signcrypt(x, r, skA), skB) = e(pk(skB), x)
+   is not subterm convergent: its right-hand side e(pk(skB), x) is not a
+   subterm of the left-hand side, so Tamarin's wellformedness check fails.
+
+   Here Bob's step is split in two, which keeps the theory subterm
+   convergent and gives the same K on both sides:
+     1. verifySignature returns the ephemeral x. The signcryption term
+        carries Bob's public key, so only the holder of skB can run it,
+        and it only succeeds for a pk(skA) matching the signer.
+     2. Bob then computes K = e(pk(skB), x) himself, exactly as Alice
+        computes e(pkB, x).
+   The ProVerif model expresses step 1+2 directly as a destructor
+   (B_calc), which ProVerif accepts; Tamarin needs this split form. */
+equations:
+    sdec(senc(m, k), k) = m,
+    verifySignature(pk(skA), r, signcrypt(x, r, skA, pk(skB)), skB) = x
+
+/* --- 1. Setup --- */
+rule Setup_Alice:
+    [ Fr(~skA) ]
+  -->
+    [ !LtkA(~skA), !PkA(pk(~skA)), Out(pk(~skA)) ]
+
+rule Setup_Bob:
+    [ Fr(~skB) ]
+  -->
+    [ !LtkB(~skB), !PkB(pk(~skB)), Out(pk(~skB)) ]
+
+/* --- 2. Alice (Sender) --- */
+rule Alice_Sender:
+    let
+        K_dh  = e(pkB, ~x)
+        k_enc = h(<'encryption', K_dh>)
+        c     = senc(~m, k_enc)
+        r     = h(<~m, K_dh>)
+        s     = signcrypt(~x, r, ~skA, pkB)
+    in
+    [ 
+      Fr(~x), 
+      Fr(~m), 
+      !LtkA(~skA), 
+      !PkB(pkB)    
+    ]
+-->
+    [ Out( <c, r, s> ), St_Alice_Sent('Alice', 'Bob', ~m, r) ]
+
+/* --- 3. Bob (Receiver) --- */
+rule Bob_Receiver:
+    let
+        x_prime     = verifySignature(pkA, r, s, ~skB)
+        K_prime     = e(pk(~skB), x_prime)
+        k_enc_prime = h(<'encryption', K_prime>)
+        m_prime     = sdec(c, k_enc_prime)
+        r_check     = h(<m_prime, K_prime>)
+    in
+    [ 
+      !LtkB(~skB), 
+      !PkA(pkA), 
+      In( <c, r, s> ) 
+    ]
+  --[ 
+      Eq(r, r_check),
+      Finished_Bob('Bob', m_prime)
+    ]->
+    [ ]
+
+restriction Equality:
+    "All x y #i. Eq(x, y) @i ==> x = y"
+
+
+lemma Executability:
+    exists-trace
+    "Ex B m #i. Finished_Bob(B, m) @i"
+
+
+end
